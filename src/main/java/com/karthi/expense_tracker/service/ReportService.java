@@ -24,7 +24,11 @@ import java.util.List;
 import com.karthi.expense_tracker.dto.MonthTypeTotal;
 import com.karthi.expense_tracker.dto.TrendPoint;
 import java.util.ArrayList;
-
+import com.karthi.expense_tracker.dto.DailySpend;
+import com.karthi.expense_tracker.dto.TransactionResponse;
+import org.springframework.data.domain.PageRequest;
+import java.util.HashMap;
+import java.util.Map;
 @Service
 @Transactional(readOnly = true)
 public class ReportService {
@@ -109,6 +113,46 @@ public class ReportService {
             result.add(new TrendPoint(ym.toString(), income, expense));
         }
         return result;
+    }
+
+        /** Spending for every day of the month (oldest first), with zero for days without spending. */
+    public List<DailySpend> daily(String month) {
+        User user = currentUser.get();
+        YearMonth ym = parseMonth(month);
+
+        List<DailySpend> rows = transactionRepository.dailyExpenses(
+                user.getId(), TransactionType.EXPENSE, ym.atDay(1), ym.atEndOfMonth());
+
+        Map<LocalDate, BigDecimal> byDate = new HashMap<>();
+        for (DailySpend r : rows) {
+            byDate.put(r.date(), r.amount());
+        }
+
+        List<DailySpend> result = new ArrayList<>();
+        for (int day = 1; day <= ym.lengthOfMonth(); day++) {
+            LocalDate date = ym.atDay(day);
+            result.add(new DailySpend(date, byDate.getOrDefault(date, BigDecimal.ZERO)));
+        }
+        return result;
+    }
+
+    /** The biggest expenses of the month, largest first. */
+    public List<TransactionResponse> topExpenses(String month, int limit) {
+        if (limit < 1 || limit > 20) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 20");
+        }
+        User user = currentUser.get();
+        YearMonth ym = parseMonth(month);
+
+        return transactionRepository
+                .findByUserIdAndTypeAndTransactionDateBetweenOrderByAmountDesc(
+                        user.getId(), TransactionType.EXPENSE, ym.atDay(1), ym.atEndOfMonth(),
+                        PageRequest.of(0, limit))
+                .stream()
+                .map(t -> new TransactionResponse(
+                        t.getId(), t.getAmount(), t.getType(), t.getDescription(),
+                        t.getTransactionDate(), t.getCategory().getId(), t.getCategory().getName()))
+                .toList();
     }
 
     // "2026-10" -> YearMonth; missing means the current month

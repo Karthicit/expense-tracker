@@ -1,18 +1,21 @@
 package com.karthi.expense_tracker.repository;
 
-import com.karthi.expense_tracker.dto.CategoryTotal;
-import com.karthi.expense_tracker.dto.MonthTypeTotal;
-import com.karthi.expense_tracker.entity.Transaction;
-import com.karthi.expense_tracker.entity.TransactionType;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import com.karthi.expense_tracker.dto.MonthTypeTotal;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.karthi.expense_tracker.dto.CategoryTotal;
+import com.karthi.expense_tracker.dto.MonthTypeTotal;
+import com.karthi.expense_tracker.entity.Transaction;
+import com.karthi.expense_tracker.entity.TransactionType;
+
+import com.karthi.expense_tracker.dto.DailySpend;
+import org.springframework.data.domain.Pageable;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
@@ -50,4 +53,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<MonthTypeTotal> monthlyTotals(@Param("userId") Long userId,
                                        @Param("from") LocalDate from,
                                        @Param("to") LocalDate to);
+
+                                           // one row per day that has spending: SUM(amount) ... GROUP BY date
+    @Query("select new com.karthi.expense_tracker.dto.DailySpend(t.transactionDate, sum(t.amount)) "
+            + "from Transaction t "
+            + "where t.user.id = :userId and t.type = :type "
+            + "and t.transactionDate between :from and :to "
+            + "group by t.transactionDate")
+    List<DailySpend> dailyExpenses(@Param("userId") Long userId,
+                                   @Param("type") TransactionType type,
+                                   @Param("from") LocalDate from,
+                                   @Param("to") LocalDate to);
+
+    // Spring builds this query from the name; Pageable limits how many rows come back
+    List<Transaction> findByUserIdAndTypeAndTransactionDateBetweenOrderByAmountDesc(
+            Long userId, TransactionType type, LocalDate from, LocalDate to, Pageable pageable);
 }
