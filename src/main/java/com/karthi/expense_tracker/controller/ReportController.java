@@ -2,11 +2,14 @@ package com.karthi.expense_tracker.controller;
 
 import com.karthi.expense_tracker.dto.CategoryReportResponse;
 import com.karthi.expense_tracker.dto.MonthlySummaryResponse;
+import com.karthi.expense_tracker.dto.TrendPoint;
 import com.karthi.expense_tracker.service.ReportService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -26,5 +29,11 @@ public class ReportController {
     @GetMapping("/category-wise")
     public CategoryReportResponse categoryWise(@RequestParam(required = false) String month) {
         return reportService.categoryWise(month);
+    }
+
+    // NEW: GET /api/reports/trend?months=6
+    @GetMapping("/trend")
+    public List<TrendPoint> trend(@RequestParam(defaultValue = "6") int months) {
+        return reportService.trend(months);
     }
 }

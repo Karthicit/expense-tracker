@@ -20,6 +20,11 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+
+import com.karthi.expense_tracker.dto.MonthTypeTotal;
+import com.karthi.expense_tracker.dto.TrendPoint;
+import java.util.ArrayList;
+
 @Service
 @Transactional(readOnly = true)
 public class ReportService {
@@ -73,6 +78,37 @@ public class ReportService {
                 .toList();
 
         return new CategoryReportResponse(ym.toString(), totalExpense, categories);
+    }
+
+
+        /** Income and expense for each of the last N months (oldest first), with zeros for empty months. */
+    public List<TrendPoint> trend(int months) {
+        if (months < 1 || months > 12) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "months must be between 1 and 12");
+        }
+        User user = currentUser.get();
+        YearMonth end = YearMonth.now();
+        YearMonth start = end.minusMonths(months - 1);
+
+        List<MonthTypeTotal> rows = transactionRepository.monthlyTotals(
+                user.getId(), start.atDay(1), end.atEndOfMonth());
+
+        List<TrendPoint> result = new ArrayList<>();
+        for (YearMonth ym = start; !ym.isAfter(end); ym = ym.plusMonths(1)) {
+            BigDecimal income = BigDecimal.ZERO;
+            BigDecimal expense = BigDecimal.ZERO;
+            for (MonthTypeTotal r : rows) {
+                if (r.year() == ym.getYear() && r.month() == ym.getMonthValue()) {
+                    if (r.type() == TransactionType.INCOME) {
+                        income = r.total();
+                    } else {
+                        expense = r.total();
+                    }
+                }
+            }
+            result.add(new TrendPoint(ym.toString(), income, expense));
+        }
+        return result;
     }
 
     // "2026-10" -> YearMonth; missing means the current month

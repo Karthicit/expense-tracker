@@ -1,11 +1,13 @@
 package com.karthi.expense_tracker.repository;
 
 import com.karthi.expense_tracker.dto.CategoryTotal;
+import com.karthi.expense_tracker.dto.MonthTypeTotal;
 import com.karthi.expense_tracker.entity.Transaction;
 import com.karthi.expense_tracker.entity.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import com.karthi.expense_tracker.dto.MonthTypeTotal;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,4 +41,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                                       @Param("type") TransactionType type,
                                       @Param("from") LocalDate from,
                                       @Param("to") LocalDate to);
+    // one row per (year, month, type): SUM(amount) ... GROUP BY year, month, type
+    @Query("select new com.karthi.expense_tracker.dto.MonthTypeTotal("
+            + "year(t.transactionDate), month(t.transactionDate), t.type, sum(t.amount)) "
+            + "from Transaction t "
+            + "where t.user.id = :userId and t.transactionDate between :from and :to "
+            + "group by year(t.transactionDate), month(t.transactionDate), t.type")
+    List<MonthTypeTotal> monthlyTotals(@Param("userId") Long userId,
+                                       @Param("from") LocalDate from,
+                                       @Param("to") LocalDate to);
 }
